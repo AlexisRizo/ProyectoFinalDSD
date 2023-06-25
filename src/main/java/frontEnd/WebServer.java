@@ -75,6 +75,11 @@ public class WebServer {
 		String query = frontendSearchRequest.getSearchQuery();
 		
 		List<String> servidores = ServerContainer.applyAction(ServerContainer.Action.Update, null);
+		if (servidores.isEmpty()) {
+			System.out.println("No hay servidores disponibles.");
+			sendResponse("No hay servidores disponibles.".getBytes(), exchange);
+			return;
+		}
 		List<String> tasks = new ArrayList<>(servidores.size());
 		System.out.println("Los intervalos son:");
 		for (int i = 0; i < servidores.size(); i++) {
