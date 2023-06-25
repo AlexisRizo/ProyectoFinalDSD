@@ -4,15 +4,20 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import common.Aggregator;
 import frontEnd.auxiliares.Text;
-import frontEnd.networking.Aggregator;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 public class WebServer {
@@ -21,12 +26,8 @@ public class WebServer {
 	private static final String PROCESS_ENDPOINT = "/procesar_datos";
 	private static final String REGISTER_ENDPOINT = "/registrar";
 	
-	private static final String WORKER_ADDRESS_1 = "http://127.0.0.1:8081/analisis_libros";
-	private static final String WORKER_ADDRESS_2 = "http://127.0.0.1:8082/analisis_libros";
-	private static final String WORKER_ADDRESS_3 = "http://127.0.0.1:8083/analisis_libros";
 	private static final String HOME_PAGE_UI_ASSETS_BASE_DIR = "/ui_assets/";
 	private static final int NUM_BOOKS = 46;
-	private static final List<String> servidores = new ArrayList<>();
 	
 	private static final ObjectMapper objectMapper = new ObjectMapper()
 		.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -61,80 +62,86 @@ public class WebServer {
 		sendResponse(response, exchange);
 	}
 	
-	private static void handleTaskRequest(HttpExchange exchange) {
+	private static void handleTaskRequest(HttpExchange exchange) throws IOException {
 		if (!exchange.getRequestMethod().equalsIgnoreCase("post")) {
 			exchange.close();
 			return;
 		}
 		
-		try {
-			FrontendSearchRequest frontendSearchRequest = objectMapper.readValue(
-				exchange.getRequestBody().readAllBytes(),
-				FrontendSearchRequest.class
-			);
-			String query = frontendSearchRequest.getSearchQuery();
-			int division = NUM_BOOKS / 3;
-			int inicial = 0;
-			
-			String task1 = inicial + "," + (division - 1) + "," + query;
-			String task2 = division + "," + ((division * 2) - 1) + "," + query;
-			String task3 = (division * 2) + "," + (NUM_BOOKS - 1) + "," + query;
-			System.out.println("Los intervalos son:");
-			System.out.println("Intervalo 1: "+task1);
-			System.out.println("Intervalo 2: "+task2);
-			System.out.println("Intervalo 3: "+task3);
-			Map<String, List<Double>> libros = new Aggregator().sendTasksToWorkers(
-				Arrays.asList(WORKER_ADDRESS_1,WORKER_ADDRESS_2,WORKER_ADDRESS_3),
-				Arrays.asList(task1,task2,task3)
+		FrontendSearchRequest frontendSearchRequest = objectMapper.readValue(
+			exchange.getRequestBody().readAllBytes(),
+			FrontendSearchRequest.class
+		);
+		String query = frontendSearchRequest.getSearchQuery();
+		
+		List<String> servidores = ServerContainer.applyAction(ServerContainer.Action.Update, null);
+		List<String> tasks = new ArrayList<>(servidores.size());
+		System.out.println("Los intervalos son:");
+		for (int i = 0; i < servidores.size(); i++) {
+			tasks.add(
+				i * NUM_BOOKS / servidores.size()
+				+ "," + ((i + 1) * NUM_BOOKS / servidores.size() - 1)
+				+ "," + query
 			);
 			
-			int n_frase = query.split(" ").length;
-			double[] nt = new double[n_frase];
-			
-			//Numero de apariciones en libros
-			for (Map.Entry<String, List<Double>> e : libros.entrySet()){
-				int contador = 0;
-				for (Double d : e.getValue()) {
-					if (d > 0.0)
-						nt[contador] += 1;
-					contador++;
-				}
-			}
-			//Calculo de la tercer propuesta
-			List<Text> books = new ArrayList<>();
-			for (Map.Entry<String, List<Double>> e : libros.entrySet()){
-				int contador = 0;
-				double fitness = 0;
-				for(Double d : e.getValue()){
-					fitness += Math.log10(libros.size()/nt[contador])*d;
-				}
-				books.add(new Text(e.getKey(),fitness));
-			}
-			
-			books.sort(Comparator.comparingDouble((Text text) -> text.fitness).reversed());
-			
-			List<Text> resultados = books.stream().filter(e -> e.fitness != 0).collect(Collectors.toList());
-			
-			String cadena = " ";
-			for(Text t: resultados)
-				cadena += t.toString()+"\n";
-			
-			StringTokenizer st = new StringTokenizer(cadena);
-			FrontendSearchResponse frontendSearchResponse = new FrontendSearchResponse(cadena, st.countTokens());
-			byte[] responseBytes = objectMapper.writeValueAsBytes(frontendSearchResponse);
-			sendResponse(responseBytes, exchange);
-		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("\tIntervalo " + i + ": " + tasks.get(i));
 		}
+		Map<String, List<Double>> libros = new Aggregator().sendTasksToWorkers(
+			servidores,
+			tasks
+		);
+		
+		double[] nt = new double[query.split("\\W").length];
+		
+		//Numero de apariciones en libros
+		for (Map.Entry<String, List<Double>> e : libros.entrySet()) {
+			int contador = 0;
+			for (Double d : e.getValue()) {
+				if (d > 0.0)
+					nt[contador] += 1;
+				contador++;
+			}
+		}
+		//Calculo de la tercer propuesta
+		List<Text> books = new ArrayList<>();
+		for (Map.Entry<String, List<Double>> e : libros.entrySet()) {
+			int contador = 0;
+			double fitness = 0;
+			for (Double d : e.getValue()) {
+				fitness += Math.log10(libros.size() / nt[contador]) * d;
+			}
+			books.add(new Text(e.getKey(), fitness));
+		}
+		
+		books.sort(Comparator.comparingDouble((Text text) -> text.fitness).reversed());
+		
+		
+		StringBuilder cadena = new StringBuilder(" ");
+		books.stream()
+			.filter(e -> e.fitness != 0)
+			.map(t -> t + "\n")
+			.forEach(cadena::append);
+		
+		StringTokenizer st = new StringTokenizer(cadena.toString());
+		FrontendSearchResponse response = new FrontendSearchResponse(cadena.toString(), st.countTokens());
+		sendResponse(objectMapper.writeValueAsBytes(response), exchange);
 	}
 	
 	private static void handleStatusCheckRequest(HttpExchange exchange) throws IOException {
-		String responseMessage = "El servidor está vivo\n";
-		sendResponse(responseMessage.getBytes(), exchange);
+		sendResponse("El servidor está vivo\n".getBytes(), exchange);
 	}
 	
-	private static void handleRegisterRequest(HttpExchange exchange) {
-	
+	private static void handleRegisterRequest(HttpExchange exchange) throws IOException {
+		String port = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+		
+		ServerContainer.applyAction(
+			ServerContainer.Action.Add,
+			"http://" + exchange.getRemoteAddress().getHostName()
+			+ ":" + new DecimalFormat("0000").format(Integer.parseInt(port))
+			+ "/analisisLibros"
+		);
+		
+		sendResponse("OK".getBytes(), exchange);
 	}
 	
 	private static byte[] readUiAsset(String asset) {
@@ -162,4 +169,47 @@ public class WebServer {
 	}
 }
 
-
+class ServerContainer {
+	private static final int MAX_WAIT = 1;
+	private static final TimeUnit MAX_WAIT_UNIT = TimeUnit.SECONDS;
+	private static final List<String> servidores = new ArrayList<>();
+	enum Action {
+		Add,
+		Update,
+		Get
+	};
+	
+	public static List<String> applyAction(Action action, String elem) {
+		if (action.equals(Action.Add)) {
+			if (!servidores.contains(elem)) {
+				servidores.add(elem);
+				System.out.println("Nuevo servidor encontrado: " + elem);
+			}
+		} else if (action.equals(Action.Update)) {
+			System.out.println("Revisando servidores.");
+			List<Boolean> isHearing = Aggregator.sendTasksAndGetFutures(
+					servidores.stream()
+						.map(s -> new Aggregator.Task(s, "".getBytes()))
+						.collect(Collectors.toList())
+				).stream()
+				.map(future -> {
+					try {
+						return new String(
+							future.get(MAX_WAIT, MAX_WAIT_UNIT),
+							StandardCharsets.UTF_8
+						).equalsIgnoreCase("OK");
+					} catch (InterruptedException | ExecutionException | TimeoutException e) {
+						return false;
+					}
+				}).collect(Collectors.toList());
+			for (int i = isHearing.size() - 1; i >= 0; i--) {
+				if (!isHearing.get(i)) {
+					System.out.println(
+						"El servidor " + servidores.remove(i) + " dejó de responder."
+					);
+				}
+			}
+		}
+		return new ArrayList<>(servidores);
+	}
+}

@@ -1,10 +1,7 @@
 package frontEnd;
 
-public class FrontendSearchRequest {
-    //private String searchQueryL;
-    private String searchQuery;
+import lombok.Getter;
 
-    public String getSearchQuery() {
-        return searchQuery;
-    }
+public class FrontendSearchRequest {
+    @Getter private String searchQuery;
 }

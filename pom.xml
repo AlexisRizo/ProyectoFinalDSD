@@ -25,6 +25,7 @@
 					<archive>
 						<manifest>
 							<mainClass>frontEnd.WebServer</mainClass>
+							<!--mainClass>backEnd.Servicio</mainClass-->
 						</manifest>
 					</archive>
 					<descriptorRefs>
@@ -46,5 +47,10 @@
 			<artifactId>jackson-databind</artifactId>
 			<version>2.15.1</version>
 		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.18.26</version>
+		</dependency><!-- Para POJOs más legibles. -->
 	</dependencies>
 </project>
