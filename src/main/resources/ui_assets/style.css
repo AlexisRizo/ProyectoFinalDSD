@@ -1,5 +1,5 @@
 body {
-  background: #330000;
+  background: #106faf;
   padding: 10px;
   font-family: Helvetica;
 }
@@ -35,6 +35,13 @@ button {
 #results {
   display: none;
   white-space: pre-wrap;
+  font-size: 14px;
+}
+
+table, th, td {
+  text-align: left;
+  border: 1px solid black;
+  border-collapse: collapse;
 }
 
 #results table {

@@ -19,9 +19,12 @@ $( document ).ready(function() {
       });
 
     function createRequest() {
-        let frontEndRequest = {
-            searchQuery: searchBox.val(),
+        var searchQueryTmp = searchBox.val();
+
+        var frontEndRequest = {
+            searchQuery: searchQueryTmp,
         };
+        
         return JSON.stringify(frontEndRequest);
     }
 
@@ -40,7 +43,7 @@ $( document ).ready(function() {
         var cantidad = data.cantidad;
         var cadena = data.cadena;
         resultsWrapper.show();
-        resultsTable.append("<thead><tr><th>Factorial del n&uacute;mero</th></tr></thead><tr><td>" + cadena + "</td></tr>");
+        resultsTable.append("<thead><tr><th>Titulo libro</th><th>Descripci&oacute;n</th></tr></thead>"+cadena);
     }
 });
 
