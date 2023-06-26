@@ -10,11 +10,14 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Servicio {
 	private static final String MAIN_SERVER_ADDRESS = "http://127.0.0.1:3000/registrar";
 	private static final String BOOK_ANALISYS_ENDPOINT = "/analisisLibros";
 	private static final String STATUS_ENDPOINT = "/status";
+	private static final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 	
 	public static void main(String[] args) throws IOException {
 		int port = args.length == 1 ? Integer.parseInt(args[0]) : 8082;
@@ -34,6 +37,18 @@ public class Servicio {
 			result = Client.sendTaskAndGetString(MAIN_SERVER_ADDRESS, ("" + port).getBytes());
 		}
 		System.out.println("Servidor registrado exitosamente.");
+		
+		executor.schedule(() -> keepRegistered(port), 1, TimeUnit.SECONDS);
+	}
+	
+	private static void keepRegistered(int port) {
+		String result = Client.sendTaskAndGetString(MAIN_SERVER_ADDRESS, ("" + port).getBytes());
+		while (!result.equalsIgnoreCase("OK")) {
+			System.out.println("Error de mantenimiento de registro. Reintentando.");
+			result = Client.sendTaskAndGetString(MAIN_SERVER_ADDRESS, ("" + port).getBytes());
+		}
+		System.out.println("Servidor sigue registrado.");
+		executor.schedule(() -> keepRegistered(port), 1, TimeUnit.SECONDS);
 	}
 	
 	private static void handleBookAnalisysRequest(HttpExchange exchange) throws IOException {

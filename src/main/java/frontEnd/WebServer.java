@@ -189,6 +189,8 @@ class ServerContainer {
 			if (!servidores.contains(elem)) {
 				servidores.add(elem);
 				System.out.println("Nuevo servidor encontrado: " + elem);
+			} else {
+				System.out.println("El servidor " + elem + " sigue registrado.");
 			}
 		} else if (action.equals(Action.Update)) {
 			System.out.println("Revisando servidores.");
