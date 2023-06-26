@@ -19,12 +19,9 @@ $( document ).ready(function() {
       });
 
     function createRequest() {
-        var searchQueryTmp = searchBox.val();
-
-        var frontEndRequest = {
-            searchQuery: searchQueryTmp,
+        let frontEndRequest = {
+            searchQuery: searchBox.val(),
         };
-        
         return JSON.stringify(frontEndRequest);
     }
 

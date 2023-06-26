@@ -1,12 +1,13 @@
 package frontEnd;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import common.Aggregator;
-import frontEnd.auxiliares.Text;
 import frontEnd.auxiliares.BooksClass;
+import frontEnd.auxiliares.Text;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -64,24 +65,19 @@ public class WebServer {
 	}
 	
 	private static void handleTaskRequest(HttpExchange exchange) throws IOException {
-		if (!exchange.getRequestMethod().equalsIgnoreCase("post")) {
-			exchange.close();
-			return;
-		}
-		
-		FrontendSearchRequest frontendSearchRequest = objectMapper.readValue(
+		String query = objectMapper.readValue(
 			exchange.getRequestBody().readAllBytes(),
-			FrontendSearchRequest.class
-		);
-		String query = frontendSearchRequest.getSearchQuery();
+			new TypeReference<Map<String, Object>>() {}
+		).get("searchQuery").toString();
+		System.out.println("query: " + query);
 		
 		List<String> servidores = ServerContainer.applyAction(ServerContainer.Action.Update, null);
-		System.out.println(Arrays.toString(servidores.toArray()));
 		if (servidores.isEmpty()) {
 			System.out.println("No hay servidores disponibles.");
 			sendResponse("No hay servidores disponibles.".getBytes(), exchange);
 			return;
 		}
+		
 		List<String> tasks = new ArrayList<>(servidores.size());
 		System.out.println("Los intervalos son:");
 		for (int i = 0; i < servidores.size(); i++) {
@@ -90,15 +86,14 @@ public class WebServer {
 				+ "," + ((i + 1) * NUM_BOOKS / servidores.size() - 1)
 				+ "," + query
 			);
-			
 			System.out.println("\tIntervalo " + i + ": " + tasks.get(i));
 		}
+		
 		Map<String, List<Double>> libros = new Aggregator().sendTasksToWorkers(
 			servidores,
 			tasks
 		);
 		double[] nt = new double[query.split("\\W").length];
-		
 		//Numero de apariciones en libros
 		for (Map.Entry<String, List<Double>> e : libros.entrySet()) {
 			int contador = 0;
