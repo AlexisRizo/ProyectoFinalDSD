@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import common.Aggregator;
 import frontEnd.auxiliares.Text;
+import frontEnd.auxiliares.BooksClass;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -75,6 +76,7 @@ public class WebServer {
 		String query = frontendSearchRequest.getSearchQuery();
 		
 		List<String> servidores = ServerContainer.applyAction(ServerContainer.Action.Update, null);
+		System.out.println(Arrays.toString(servidores.toArray()));
 		if (servidores.isEmpty()) {
 			System.out.println("No hay servidores disponibles.");
 			sendResponse("No hay servidores disponibles.".getBytes(), exchange);
@@ -95,7 +97,6 @@ public class WebServer {
 			servidores,
 			tasks
 		);
-		
 		double[] nt = new double[query.split("\\W").length];
 		
 		//Numero de apariciones en libros
@@ -119,16 +120,16 @@ public class WebServer {
 		}
 		
 		books.sort(Comparator.comparingDouble((Text text) -> text.fitness).reversed());
+		books.stream().filter(e -> e.fitness != 0);
 		
-		
-		StringBuilder cadena = new StringBuilder(" ");
-		books.stream()
-			.filter(e -> e.fitness != 0)
-			.map(t -> t + "\n")
-			.forEach(cadena::append);
-		
-		StringTokenizer st = new StringTokenizer(cadena.toString());
-		FrontendSearchResponse response = new FrontendSearchResponse(cadena.toString(), st.countTokens());
+		String cadena = "";
+		for(Text t : books){
+			String s = t.name;
+			cadena += BooksClass.Books.getInformation(s)+"\n";
+		}
+
+		StringTokenizer st = new StringTokenizer(cadena);
+		FrontendSearchResponse response = new FrontendSearchResponse(cadena, st.countTokens());
 		sendResponse(objectMapper.writeValueAsBytes(response), exchange);
 	}
 	
@@ -189,8 +190,6 @@ class ServerContainer {
 			if (!servidores.contains(elem)) {
 				servidores.add(elem);
 				System.out.println("Nuevo servidor encontrado: " + elem);
-			} else {
-				System.out.println("El servidor " + elem + " sigue registrado.");
 			}
 		} else if (action.equals(Action.Update)) {
 			System.out.println("Revisando servidores.");
