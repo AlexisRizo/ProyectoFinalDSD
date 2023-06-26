@@ -123,7 +123,7 @@ public class BooksClass{
             String s = "";
             for(Books book : Books.values()){
                 if(string.equals(book.getNameFile())){
-                    s+= book.getCiteFile()+" "+book.getDescription();
+                    s+= book.getCiteFile()+"&"+book.getDescription();
                     break;
                 }
             }
