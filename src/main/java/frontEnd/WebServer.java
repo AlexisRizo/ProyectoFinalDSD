@@ -193,9 +193,10 @@ class ServerContainer {
 		} else if (action.equals(Action.Update)) {
 			System.out.println("Revisando servidores.");
 			List<Boolean> isHearing = Aggregator.sendTasksAndGetFutures(
-					servidores.stream()
-						.map(s -> new Aggregator.Task(s, "".getBytes()))
-						.collect(Collectors.toList())
+					servidores.stream().map(s -> new Aggregator.Task(
+						s.replace("analisisLibros", "status"),
+						"".getBytes()
+					)).collect(Collectors.toList())
 				).stream()
 				.map(future -> {
 					try {
