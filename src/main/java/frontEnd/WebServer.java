@@ -1,6 +1,5 @@
 package frontEnd;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -65,19 +64,24 @@ public class WebServer {
 	}
 	
 	private static void handleTaskRequest(HttpExchange exchange) throws IOException {
-		String query = objectMapper.readValue(
+		if (!exchange.getRequestMethod().equalsIgnoreCase("post")) {
+			exchange.close();
+			return;
+		}
+		
+		FrontendSearchRequest frontendSearchRequest = objectMapper.readValue(
 			exchange.getRequestBody().readAllBytes(),
-			new TypeReference<Map<String, Object>>() {}
-		).get("searchQuery").toString();
-		System.out.println("query: " + query);
+			FrontendSearchRequest.class
+		);
+		String query = frontendSearchRequest.getSearchQuery();
 		
 		List<String> servidores = ServerContainer.applyAction(ServerContainer.Action.Update, null);
+		System.out.println(Arrays.toString(servidores.toArray()));
 		if (servidores.isEmpty()) {
 			System.out.println("No hay servidores disponibles.");
 			sendResponse("No hay servidores disponibles.".getBytes(), exchange);
 			return;
 		}
-		
 		List<String> tasks = new ArrayList<>(servidores.size());
 		System.out.println("Los intervalos son:");
 		for (int i = 0; i < servidores.size(); i++) {
@@ -86,14 +90,15 @@ public class WebServer {
 				+ "," + ((i + 1) * NUM_BOOKS / servidores.size() - 1)
 				+ "," + query
 			);
+			
 			System.out.println("\tIntervalo " + i + ": " + tasks.get(i));
 		}
-		
 		Map<String, List<Double>> libros = new Aggregator().sendTasksToWorkers(
 			servidores,
 			tasks
 		);
 		double[] nt = new double[query.split("\\W").length];
+		
 		//Numero de apariciones en libros
 		for (Map.Entry<String, List<Double>> e : libros.entrySet()) {
 			int contador = 0;
@@ -120,7 +125,8 @@ public class WebServer {
 		String cadena = "";
 		for(Text t : books){
 			String s = t.name;
-			cadena += BooksClass.Books.getInformation(s)+"\n";
+			String[] cad = BooksClass.Books.getInformation(s).split("&");
+			cadena += "<tr><td>"+cad[0]+"</td><td>"+cad[1]+"</td></tr>\n";
 		}
 
 		StringTokenizer st = new StringTokenizer(cadena);
